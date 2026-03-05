@@ -1,0 +1,9 @@
+serde -> JSON en rust
+parser -> string a JSON from_str, JSON a String to_string_pretty
+tcp -> permite conectarse
+maximo usuario 512
+
+
+cliente se conecta al servidor con nombre
+el servidor recibe multiples clientes validando los nombres
+no puede haber nombres repetidos
