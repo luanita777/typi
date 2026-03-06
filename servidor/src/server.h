@@ -3,8 +3,8 @@
 
 #include <netinet/in.h>
 
-int crearSocket();
-struct sockaddr_in* crearDireccion(char *ip, int puerto);
+int crearSocketServidor();
+struct sockaddr_in* crearDireccionServidor(char *ip, int puerto);
 void ejecutaServidor(int puerto, char *ip); 
 
 #endif
