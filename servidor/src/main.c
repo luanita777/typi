@@ -12,11 +12,11 @@ int main(int numArgs, char *args[]){
   }
 
   //Validamos IP
-  char *received_ip = args[1];
+  char *ipRecibida = args[1];
 
   struct in_addr addr_aux;
-  if (inet_pton(AF_INET, received_ip, &addr_aux) != 1) {
-    fprintf(stderr, "Error: '%s' no es una dirección IPv4 válida.\n", received_ip);
+  if (inet_pton(AF_INET, ipRecibida, &addr_aux) != 1) {
+    fprintf(stderr, "Error: '%s' no es una dirección IPv4 válida.\n", ipRecibida);
     return 1;
   }
 
@@ -43,6 +43,6 @@ int main(int numArgs, char *args[]){
   int puerto = (int) puertoL;
   
   printf("[INFO] IP y puerto validados. Iniciando...\n");
-  runServer(puerto, received_ip);
+  ejecutaServidor(puerto, ipRecibida);
   return 0;
 }
