@@ -7,12 +7,23 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#define MAX_CLIENTES 10
+
 struct SocketAceptado{
   int socketClienteFD;
   struct sockaddr_in direccion;
   int aceptadoCorrectamente;
   int error;
 };
+
+typedef struct {
+    int socketFD;
+    char nombre[50];
+} Cliente;
+
+int clientesConectados = 0;
+int socketsClientes[MAX_CLIENTES];
+char nombresClientes[MAX_CLIENTES][50];
 
 /* ========== FUNCIONES AUXILIARES ========== */
 
@@ -100,6 +111,11 @@ struct SocketAceptado{
 			      (struct sockaddr *)&direccionCliente,
 			       &tamañoDireccionCliente);
 
+     if(socketClienteFD > 0){
+       socketsClientes[clientesConectados] = socketClienteFD;
+       clientesConectados++;
+    }
+
      struct SocketAceptado* socketAceptado = malloc(sizeof(struct SocketAceptado));
      socketAceptado->direccion = direccionCliente;
      socketAceptado->socketClienteFD = socketClienteFD;
@@ -108,7 +124,75 @@ struct SocketAceptado{
      if(!socketAceptado->aceptadoCorrectamente)
        socketAceptado->error = socketClienteFD;
 
+
+     //Si el servidor está lleno avisamos
+     if(socketClienteFD > 0){
+
+        if(clientesConectados >= MAX_CLIENTES){
+            send(socketClienteFD,"Servidor lleno\n",15,0);
+            close(socketClienteFD);
+            socketAceptado->aceptadoCorrectamente = 0;
+            return socketAceptado;
+        }
+
+        socketsClientes[clientesConectados] = socketClienteFD;
+        clientesConectados++;
+    }
+
      return socketAceptado;
+   }
+
+  int nombreExiste(char *nombre){
+    for(int i = 0; i < clientesConectados; i++)
+      if(strcmp(nombresClientes[i], nombre) == 0)
+	return 1;
+    return 0;
+  }
+
+  int obtenerIndiceCliente(int socketFD){
+    for(int i = 0; i < clientesConectados; i++)
+        if(socketsClientes[i] == socketFD)
+            return i;
+    return -1;
+  }
+
+
+  void identificarCliente(int socketFD, char *nombre){
+
+    char mensaje[100];
+    int indice = obtenerIndiceCliente(socketFD);
+
+    while(1){
+
+      send(socketFD,"Introduce tu nombre: ",strlen("Introduce tu nombre: "),0);
+      int nombreRecibido = recv(socketFD, nombre, 50, 0);
+      
+      if(nombreRecibido <= 0)
+	return;
+      
+      nombre[nombreRecibido] = '\0';
+      nombre[strcspn(nombre, "\r\n")] = '\0';
+      
+      if(nombreExiste(nombre))
+	send(socketFD, "Ese nombre ya esta en uso\n", 26, 0);
+      else
+	break;
+      
+    }
+    
+    strcpy(nombresClientes[indice], nombre);
+
+    snprintf(mensaje,sizeof(mensaje),"< Bienvenidx %s >\n",nombre);
+
+    send(socketFD,mensaje,strlen(mensaje),0);
+
+    printf("%s",mensaje);
+}
+
+   void enviarMensajeAlResto(int socketOrigen, char *mensaje){
+       for(int i = 0; i < clientesConectados; i++)
+	 if(socketsClientes[i] != socketOrigen)
+	   send(socketsClientes[i], mensaje, strlen(mensaje), 0);
    }
 
   /**
@@ -139,14 +223,32 @@ struct SocketAceptado{
      int socketFD = *(int*)arg;
      free(arg);
      char mensaje[512];
+     char nombre[50];
+     
+     identificarCliente(socketFD, nombre);
      
      while(1){
        
        int mensajeRecibidoExitosamente = recv(socketFD, mensaje, 512, 0);
        
        if(mensajeRecibidoExitosamente > 0){
+
 	 mensaje[mensajeRecibidoExitosamente] = '\0';
-	 printf("El cliente envió: %s\n", mensaje);
+	 mensaje[strcspn(mensaje, "\r\n")] = '\0';
+	 
+	 char mensajeFinal[600];
+	 
+	 snprintf(
+		  mensajeFinal,
+		  sizeof(mensajeFinal),
+		  "> %s: %s\n",
+		  nombre,
+		  mensaje
+		  );
+
+	 printf("%s", mensajeFinal);
+	 
+	 enviarMensajeAlResto(socketFD, mensajeFinal);
        } else {
 	 if(mensajeRecibidoExitosamente == -1)
 	   fprintf(stderr, "Error: Sucedió un problema al recibir los datos.\n");
@@ -249,7 +351,7 @@ struct SocketAceptado{
      } else
        printf("Servidor ejecutandose correctamente...\n\n");
      
-     listen(socketServidorFD, 10);
+     listen(socketServidorFD, MAX_CLIENTES);
      
      escucharConexiones(socketServidorFD);
      
