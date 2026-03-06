@@ -2,18 +2,30 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
+#include <arpa/inet.h>
+#include "server.h"
 
 int main(int numArgs, char *args[]){
-  if(numArgs < 2 || numArgs > 2){
-    fprintf(stderr, "Uso: %s <puerto>\n", args[0]);
+  if(numArgs != 3){
+    fprintf(stderr, "Uso: %s <ip> <puerto>\n", args[0]);
     return 1;
   }
 
+  //Validamos IP
+  char *received_ip = args[1];
+
+  struct in_addr addr_aux;
+  if (inet_pton(AF_INET, received_ip, &addr_aux) != 1) {
+    fprintf(stderr, "Error: '%s' no es una dirección IPv4 válida.\n", received_ip);
+    return 1;
+  }
+
+  //Validamos Puerto
   char *endptr;
   errno = 0;
-  long puertoL = strtol(args[1], &endptr, 10);
+  long puertoL = strtol(args[2], &endptr, 10);
 
-  if(args[1] == endptr){
+  if(args[2] == endptr){
     fprintf(stderr, "Error: el puerto no es un número válido.\n");
     return 1;
   }
@@ -30,7 +42,7 @@ int main(int numArgs, char *args[]){
   
   int puerto = (int) puertoL;
   
-  printf("[INFO] Servidor iniciando en puerto %d\n", puerto);
-  
+  printf("[INFO] IP y puerto validados. Iniciando...\n");
+  runServer(puerto, received_ip);
   return 0;
 }
