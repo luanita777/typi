@@ -1,6 +1,10 @@
 package main
 
-import "net"
+import (
+	"bufio"
+	"fmt"
+	"net"
+)
 
 // Tipo de dato cliente que tiene como propiedades su conexion(FD)
 // y su tipo de usuario
@@ -16,5 +20,18 @@ func newCliente(conn net.Conn) *Cliente {
 	return &cliente
 }
 
-//Más adelante aqui haremos cosas como leer mensajes
-//del cliente y enviarle mensajes al  cliente, etc...
+func (c *Cliente) leeMensajesCliente() {
+	var lector *bufio.Reader
+	lector = bufio.NewReader(c.conn)
+	for {
+		var mensaje string
+		var err error
+		mensaje, err = lector.ReadString('\n')
+		if err != nil {
+			fmt.Println("El cliente se desconectó")
+			c.conn.Close()
+			return
+		}
+		fmt.Println("Mensaje del cliente: ", mensaje)
+	}
+}

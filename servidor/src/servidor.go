@@ -53,7 +53,5 @@ func (s *Servidor) manejarConexionCliente(conn net.Conn) {
 
 	var cliente *Cliente = newCliente(conn)
 	fmt.Println("Cliente conectado:", conn.RemoteAddr())
-
-	//descartamos cliente porque todavia no lo usamos
-	_ = cliente
+	go cliente.leeMensajesCliente()
 }
