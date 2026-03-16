@@ -1,4 +1,4 @@
-package protocol
+package protocolo
 
 //Creamos un objeto por cada JSON que va a enviar el servidor
 

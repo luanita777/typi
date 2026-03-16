@@ -1,4 +1,4 @@
-package protocol
+package protocolo
 
 //Creamos un objeti por cada JSON que recibe el servidor, así
 // no creamos manualmente los JSON cuando los queramos enviar
@@ -32,6 +32,11 @@ package protocol
 // significa que son exportados (visibles fuera del paquete). Esto es
 // necesario para que la biblioteca de JSON pueda leer y escribir
 // esos campos al convertir entre structs y JSON.
+
+// lo vamos a usar para decodificar los mensajes que se envian
+type MensajeBase struct {
+	Type TipoMensaje `json:"type"`
+}
 
 // mensaje IDENTIFY enviado por el cliente para identificarse
 type IdentifyMessage struct {

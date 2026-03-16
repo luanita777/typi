@@ -1,4 +1,4 @@
-package protocol
+package protocolo
 
 // tipo de operación que el cliente solicita al servidor
 type TipoMensaje string
@@ -41,4 +41,5 @@ const (
 	NotJoined         TipoResultado = "NOT_JOINED"
 	Invalid           TipoResultado = "INVALID"
 	NotIdentified     TipoResultado = "NOT_IDENTIFIED"
+	Response          TipoResultado = "RESPONSE"
 )

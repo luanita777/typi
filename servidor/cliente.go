@@ -4,19 +4,24 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"servidor/protocolo"
 )
 
 // Tipo de dato cliente que tiene como propiedades su conexion(FD)
-// y su tipo de usuario
+// y su nombre de usuario, su estado y además una referencia al servidor
+// que lo instanció
 type Cliente struct {
 	conn          net.Conn
+	servidor      *Servidor
 	nombreUsuario string
+	estado        protocolo.StatusCliente
 }
 
 // Creamos un nuevo cliente (Constructor)
-func newCliente(conn net.Conn) *Cliente {
+func newCliente(conn net.Conn, servidor *Servidor) *Cliente {
 	var cliente Cliente
 	cliente.conn = conn
+	cliente.servidor = servidor
 	return &cliente
 }
 
@@ -32,6 +37,6 @@ func (c *Cliente) leeMensajesCliente() {
 			c.conn.Close()
 			return
 		}
-		fmt.Println("Mensaje del cliente: ", mensaje)
+		c.servidor.ProcesarMensaje(c, mensaje)
 	}
 }
