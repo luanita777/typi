@@ -85,16 +85,28 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var msj protocolo.IdentifyMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderMensajeInvalido(cliente)
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
 			return
 		}
 		GIdentifica(cliente, &msj)
 
 	case protocolo.Status:
 		var msj protocolo.StatusMessage
-		json.Unmarshal(mensajeJSON, &msj)
-		//gestor.gStatus(cliente, &msj)
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GActualizaStatus(cliente, &msj)
 
+	case protocolo.Users:
+		var msj protocolo.UsersMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GListaDeUsuarios(cliente)
 	}
 
 }
