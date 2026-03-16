@@ -17,11 +17,11 @@ import (
 
 // ========= FUNCIONES AUXILIARES ========= //
 
-func GResponderOperacionInvalida(cliente *Cliente, operacion string, respuesta string) {
+func GResponderOperacionInvalida(cliente *Cliente, operacion protocolo.TipoMensaje, respuesta protocolo.TipoResultado) {
 	respuestaJSON := protocolo.ResponseMessage{
 		Type:      "RESPONSE",
-		Operation: protocolo.TipoMensaje(operacion),
-		Result:    protocolo.TipoResultado(respuesta),
+		Operation: operacion,
+		Result:    respuesta,
 	}
 
 	datosJSON, _ := json.Marshal(respuestaJSON)
@@ -29,21 +29,33 @@ func GResponderOperacionInvalida(cliente *Cliente, operacion string, respuesta s
 	cliente.conn.Close()
 }
 
-func GResponderError(cliente *Cliente, operacion string, respuesta string) {
+func GResponderError(cliente *Cliente, operacion protocolo.TipoMensaje, respuesta protocolo.TipoResultado) {
 	respuestaJSON := protocolo.ResponseMessage{
 		Type:      "RESPONSE",
-		Operation: protocolo.TipoMensaje(operacion),
-		Result:    protocolo.TipoResultado(respuesta),
+		Operation: operacion,
+		Result:    respuesta,
 	}
 
 	datosJSON, _ := json.Marshal(respuestaJSON)
 	cliente.conn.Write(append(datosJSON, '\n'))
 }
 
-func GResponderSuccess(cliente *Cliente, operacion string) {
+func GResponderErrorExtra(cliente *Cliente, operacion protocolo.TipoMensaje, respuesta protocolo.TipoResultado, extra string) {
+	respuestaJSON := protocolo.ResponseMessage{
+		Type:      "RESPONSE",
+		Operation: operacion,
+		Result:    respuesta,
+		Extra:     extra,
+	}
+
+	datosJSON, _ := json.Marshal(respuestaJSON)
+	cliente.conn.Write(append(datosJSON, '\n'))
+}
+
+func GResponderSuccess(cliente *Cliente, operacion protocolo.TipoMensaje) {
 	respuesta := protocolo.ResponseMessage{
 		Type:      "RESPONSE",
-		Operation: protocolo.TipoMensaje(operacion),
+		Operation: operacion,
 		Result:    "SUCCESS",
 	}
 
@@ -75,7 +87,7 @@ func GNotificarATodos(servidor *Servidor, mensaje any, excluir *Cliente) {
 func clienteIdentificado(cliente *Cliente) bool {
 
 	if cliente.nombreUsuario == "" {
-		GResponderOperacionInvalida(cliente, "IDENTIFY", "NOT_IDENTIFIED")
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.NotIdentified)
 		return false
 	}
 
@@ -86,19 +98,19 @@ func clienteIdentificado(cliente *Cliente) bool {
 
 func GIdentifica(cliente *Cliente, msg *protocolo.IdentifyMessage) {
 	if msg.Username == "" || len(msg.Username) > 8 {
-		GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 		return
 	}
 
 	if cliente.nombreUsuario != "" {
-		GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 		return
 	}
 
 	//map access multi-value return -> mapaccess2
 	_, existe := cliente.servidor.clientes[msg.Username]
 	if existe == true {
-		GResponderError(cliente, "IDENTIFY", "USER_ALREADY_EXISTS")
+		GResponderError(cliente, protocolo.Identify, protocolo.UserAlreadyExists)
 		return
 	}
 
@@ -106,7 +118,7 @@ func GIdentifica(cliente *Cliente, msg *protocolo.IdentifyMessage) {
 	cliente.estado = protocolo.Active
 	cliente.servidor.clientes[msg.Username] = cliente
 
-	GResponderSuccess(cliente, "IDENTIFY")
+	GResponderSuccess(cliente, protocolo.Identify)
 	GNotificarNuevoUsuario(cliente)
 }
 
@@ -125,8 +137,8 @@ func GActualizaStatus(cliente *Cliente, msg *protocolo.StatusMessage) {
 		return
 	}
 
-	if (msg.Status != "ACTIVE") && (msg.Status != "AWAY") && (msg.Status != "BUSY") {
-		GResponderOperacionInvalida(cliente, "IDENTIFY", "INVALID")
+	if (msg.Status != protocolo.Active) && (msg.Status != protocolo.Away) && (msg.Status != protocolo.Busy) {
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 		return
 	}
 
@@ -162,4 +174,37 @@ func GListaDeUsuarios(cliente *Cliente) {
 	}
 
 	GEnviarJSON(cliente, datosJSON)
+}
+
+func GMensajePrivado(cliente *Cliente, msg *protocolo.TextMessage) {
+
+	if !clienteIdentificado(cliente) {
+		return
+	}
+
+	if msg.Username == "" || msg.Text == "" {
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
+		return
+	}
+
+	if msg.Username == cliente.nombreUsuario {
+		return
+	}
+
+	clienteDestino, existe := cliente.servidor.clientes[msg.Username]
+
+	if !existe {
+		GResponderErrorExtra(cliente, protocolo.Text,
+			protocolo.NoSuchUser, msg.Username)
+		return
+	}
+
+	mensaje := protocolo.TextFromMessage{
+		Type:     "TEXT_FROM",
+		Username: cliente.nombreUsuario,
+		Text:     msg.Text,
+	}
+
+	datosJSON, _ := json.Marshal(mensaje)
+	clienteDestino.conn.Write(append(datosJSON, '\n'))
 }

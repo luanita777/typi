@@ -17,6 +17,7 @@ const (
 	RoomText  TipoMensaje = "ROOM_TEXT"
 	LeaveRoom TipoMensaje = "LEAVE_ROOM"
 
+	Invalid    TipoMensaje = "INVALID"
 	Disconnect TipoMensaje = "DISCONNECT"
 )
 
@@ -39,7 +40,7 @@ const (
 	NoSuchRoom        TipoResultado = "NO_SUCH_ROOM"
 	NotInvited        TipoResultado = "NOT_INVITED"
 	NotJoined         TipoResultado = "NOT_JOINED"
-	Invalid           TipoResultado = "INVALID"
+	ResultadoInvalido TipoResultado = "INVALID"
 	NotIdentified     TipoResultado = "NOT_IDENTIFIED"
 	Response          TipoResultado = "RESPONSE"
 )

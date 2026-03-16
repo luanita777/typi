@@ -107,6 +107,16 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 			return
 		}
 		GListaDeUsuarios(cliente)
+
+	case protocolo.Text:
+		var msj protocolo.TextMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GMensajePrivado(cliente, &msj)
+
 	}
 
 }
