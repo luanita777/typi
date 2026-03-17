@@ -117,6 +117,15 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		}
 		GMensajePrivado(cliente, &msj)
 
+	case protocolo.PublicText:
+		var msj protocolo.PublicTextFromMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GMensajePublico(cliente, &msj)
+
 	}
 
 }
