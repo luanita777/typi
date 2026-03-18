@@ -147,6 +147,14 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		}
 		GInvitaACuarto(cliente, &msj)
 
+	case protocolo.JoinRoom:
+		var msj protocolo.JoinRoomMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GUnirseACuarto(cliente, &msj)
 	}
 
 }

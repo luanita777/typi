@@ -79,3 +79,48 @@ func GInvitaACuarto(cliente *Cliente, msg *protocolo.InviteMessage) {
 		GEnviarJSON(invitado, mensajeJSON)
 	}
 }
+
+func GUnirseACuarto(cliente *Cliente, msg *protocolo.JoinRoomMessage) {
+	if !clienteIdentificado(cliente) {
+		return
+	}
+
+	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	if !existeCuarto {
+		GResponderErrorExtra(cliente, protocolo.JoinRoom, protocolo.NoSuchRoom, msg.Roomname)
+		return
+	}
+
+	if !cuartoActual.EstaInvitado(cliente.nombreUsuario) {
+		GResponderErrorExtra(cliente, protocolo.JoinRoom, protocolo.NotInvited, msg.Roomname)
+		return
+	}
+
+	if cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+		return
+	}
+
+	GResponderSuccessExtra(cliente, protocolo.JoinRoom, msg.Roomname)
+	cuartoActual.AgregarCliente(cliente)
+
+	notificarUnionACuartoATodos(cliente, cuartoActual)
+
+}
+
+func notificarUnionACuartoATodos(cliente *Cliente, cuarto *Cuarto) {
+	mensajeJSON := protocolo.JoinedRoomMessage{
+		Type:     "JOINED_ROOM",
+		Roomname: cuarto.nombreCuarto,
+		Username: cliente.nombreUsuario,
+	}
+	enviarATodos(cuarto, cliente, mensajeJSON)
+}
+
+func enviarATodos(cuarto *Cuarto, excluir *Cliente, mensaje any) {
+	for _, cliente := range cuarto.participantes {
+		if cliente == excluir {
+			continue
+		}
+		GEnviarJSON(cliente, mensaje)
+	}
+}
