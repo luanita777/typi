@@ -36,6 +36,7 @@ type TipoResultado string
 const (
 	Success           TipoResultado = "SUCCESS"
 	UserAlreadyExists TipoResultado = "USER_ALREADY_EXISTS"
+	RoomAlreadyExists TipoResultado = "ROOM_ALREADY_EXISTS"
 	NoSuchUser        TipoResultado = "NO_SUCH_USER"
 	NoSuchRoom        TipoResultado = "NO_SUCH_ROOM"
 	NotInvited        TipoResultado = "NOT_INVITED"

@@ -62,6 +62,17 @@ func GResponderSuccess(cliente *Cliente, operacion protocolo.TipoMensaje) {
 	GEnviarJSON(cliente, respuesta)
 }
 
+func GResponderSuccessExtra(cliente *Cliente, operacion protocolo.TipoMensaje, extra string) {
+	respuesta := protocolo.ResponseMessage{
+		Type:      "RESPONSE",
+		Operation: operacion,
+		Result:    "SUCCESS",
+		Extra:     extra,
+	}
+
+	GEnviarJSON(cliente, respuesta)
+}
+
 func GEnviarJSON(cliente *Cliente, mensaje any) {
 
 	jsonData, err := json.Marshal(mensaje)

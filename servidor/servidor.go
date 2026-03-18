@@ -14,6 +14,7 @@ type Servidor struct {
 	puerto      string
 	listener    net.Listener
 	clientes    map[string]*Cliente
+	cuartos     map[string]*Cuarto
 	numClientes int
 }
 
@@ -22,6 +23,7 @@ func newServidor(puerto string) *Servidor {
 	var servidor Servidor
 	servidor.puerto = puerto
 	servidor.clientes = make(map[string]*Cliente)
+	servidor.cuartos = make(map[string]*Cuarto)
 	return &servidor
 }
 
@@ -77,6 +79,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 	err = json.Unmarshal(mensajeJSON, &mensajeBase)
 	if err != nil {
 		fmt.Println("JSON inválido: ", err)
+		GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
 		return
 	}
 
@@ -125,6 +128,15 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 			return
 		}
 		GMensajePublico(cliente, &msj)
+
+	case protocolo.NewRoom:
+		var msj protocolo.NewRoomMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GCreaNuevoCuarto(cliente, &msj)
 
 	}
 
