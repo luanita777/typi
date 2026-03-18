@@ -27,3 +27,55 @@ func GCreaNuevoCuarto(cliente *Cliente, msg *protocolo.NewRoomMessage) {
 
 	GResponderSuccessExtra(cliente, protocolo.NewRoom, msg.Roomname)
 }
+
+func GInvitaACuarto(cliente *Cliente, msg *protocolo.InviteMessage) {
+
+	if !clienteIdentificado(cliente) {
+		return
+	}
+
+	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	if !existeCuarto {
+		GResponderErrorExtra(cliente, protocolo.Invite, protocolo.NoSuchRoom, msg.Roomname)
+		return
+	}
+
+	_, estaEnElCuarto := cuartoActual.participantes[cliente.nombreUsuario]
+	if !estaEnElCuarto {
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.NotJoined)
+		return
+	}
+
+	if msg.Usernames == nil || len(msg.Usernames) == 0 {
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
+		return
+	}
+
+	for _, username := range msg.Usernames {
+		if username == "" {
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
+			return
+		}
+
+		invitado, existe := cliente.servidor.clientes[username]
+		if !existe {
+			GResponderErrorExtra(cliente, protocolo.Invite, protocolo.NoSuchUser, username)
+			return
+		}
+
+		if cuartoActual.EstaInvitado(invitado.nombreUsuario) ||
+			cuartoActual.EstaEnCuarto(invitado.nombreUsuario) {
+			continue
+		}
+
+		mensajeJSON := protocolo.InvitationMessage{
+			Type:     "INVITATION",
+			Username: cliente.nombreUsuario,
+			Roomname: msg.Roomname,
+		}
+
+		cuartoActual.invitados[invitado.nombreUsuario] = true
+
+		GEnviarJSON(invitado, mensajeJSON)
+	}
+}

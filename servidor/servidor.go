@@ -138,6 +138,15 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		}
 		GCreaNuevoCuarto(cliente, &msj)
 
+	case protocolo.Invite:
+		var msj protocolo.InviteMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GInvitaACuarto(cliente, &msj)
+
 	}
 
 }
