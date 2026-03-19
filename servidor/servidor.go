@@ -155,6 +155,24 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 			return
 		}
 		GUnirseACuarto(cliente, &msj)
+
+	case protocolo.RoomUsers:
+		var msj protocolo.RoomUsersMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GUsuariosCuarto(cliente, &msj)
+
+	case protocolo.RoomText:
+		var msj protocolo.RoomTextMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return
+		}
+		GRoomText(cliente, &msj)
 	}
 
 }

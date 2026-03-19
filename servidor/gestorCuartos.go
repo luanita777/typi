@@ -100,9 +100,10 @@ func GUnirseACuarto(cliente *Cliente, msg *protocolo.JoinRoomMessage) {
 		return
 	}
 
-	GResponderSuccessExtra(cliente, protocolo.JoinRoom, msg.Roomname)
 	cuartoActual.AgregarCliente(cliente)
+	delete(cuartoActual.invitados, cliente.nombreUsuario)
 
+	GResponderSuccessExtra(cliente, protocolo.JoinRoom, msg.Roomname)
 	notificarUnionACuartoATodos(cliente, cuartoActual)
 
 }
@@ -113,14 +114,71 @@ func notificarUnionACuartoATodos(cliente *Cliente, cuarto *Cuarto) {
 		Roomname: cuarto.nombreCuarto,
 		Username: cliente.nombreUsuario,
 	}
-	enviarATodos(cuarto, cliente, mensajeJSON)
+	enviarATodosEnElCuarto(cuarto, cliente, mensajeJSON)
 }
 
-func enviarATodos(cuarto *Cuarto, excluir *Cliente, mensaje any) {
+func enviarATodosEnElCuarto(cuarto *Cuarto, excluir *Cliente, mensaje any) {
 	for _, cliente := range cuarto.participantes {
 		if cliente == excluir {
 			continue
 		}
 		GEnviarJSON(cliente, mensaje)
 	}
+}
+
+func GUsuariosCuarto(cliente *Cliente, msg *protocolo.RoomUsersMessage) {
+	if !clienteIdentificado(cliente) {
+		return
+	}
+
+	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	if !existeCuarto {
+		GResponderErrorExtra(cliente, protocolo.RoomUsers, protocolo.NoSuchRoom, msg.Roomname)
+		return
+	}
+
+	if !cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+		GResponderErrorExtra(cliente, protocolo.RoomUsers, protocolo.NotJoined, msg.Roomname)
+		return
+	}
+
+	listaUsuarios := make(map[string]protocolo.StatusCliente)
+	for nombreUsuario, c := range cuartoActual.participantes {
+		listaUsuarios[nombreUsuario] = c.estado
+	}
+
+	mensajeJSON := protocolo.RoomUserListMessage{
+		Type:     "ROOM_USER_LIST",
+		Roomname: msg.Roomname,
+		Users:    listaUsuarios,
+	}
+
+	GEnviarJSON(cliente, mensajeJSON)
+
+}
+
+func GRoomText(cliente *Cliente, msg *protocolo.RoomTextMessage) {
+	if !clienteIdentificado(cliente) {
+		return
+	}
+
+	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	if !existeCuarto {
+		GResponderErrorExtra(cliente, protocolo.RoomText, protocolo.NoSuchRoom, msg.Roomname)
+		return
+	}
+
+	if !cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+		GResponderErrorExtra(cliente, protocolo.RoomText, protocolo.NotJoined, msg.Roomname)
+		return
+	}
+
+	mensajeJSON := protocolo.RoomTextFromMessage{
+		Type:     "ROOM_TEXT_FROM",
+		Roomname: msg.Roomname,
+		Username: cliente.nombreUsuario,
+		Text:     msg.Text,
+	}
+
+	enviarATodosEnElCuarto(cuartoActual, cliente, mensajeJSON)
 }
