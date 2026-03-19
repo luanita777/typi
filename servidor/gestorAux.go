@@ -26,7 +26,6 @@ func GResponderOperacionInvalida(cliente *Cliente, operacion protocolo.TipoMensa
 
 	datosJSON, _ := json.Marshal(respuestaJSON)
 	cliente.conn.Write(append(datosJSON, '\n'))
-	cliente.conn.Close()
 }
 
 func GResponderError(cliente *Cliente, operacion protocolo.TipoMensaje, respuesta protocolo.TipoResultado) {

@@ -182,3 +182,32 @@ func GRoomText(cliente *Cliente, msg *protocolo.RoomTextMessage) {
 
 	enviarATodosEnElCuarto(cuartoActual, cliente, mensajeJSON)
 }
+
+func GAbandonarCuarto(cliente *Cliente, msg *protocolo.LeaveRoomMessage) {
+	if !clienteIdentificado(cliente) {
+		return
+	}
+
+	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	if !existeCuarto {
+		GResponderErrorExtra(cliente, protocolo.LeaveRoom, protocolo.NoSuchRoom, msg.Roomname)
+		return
+	}
+
+	if !cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+		GResponderErrorExtra(cliente, protocolo.LeaveRoom, protocolo.NotJoined, msg.Roomname)
+		return
+	}
+
+	mensajeJSON := protocolo.LeftRoomMessage{
+		Type:     "LEFT_ROOM",
+		Roomname: msg.Roomname,
+		Username: cliente.nombreUsuario,
+	}
+
+	delete(cuartoActual.participantes, cliente.nombreUsuario)
+	if len(cuartoActual.participantes) == 0 {
+		delete(cliente.servidor.cuartos, cuartoActual.nombreCuarto)
+	}
+	enviarATodosEnElCuarto(cuartoActual, cliente, mensajeJSON)
+}

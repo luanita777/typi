@@ -26,17 +26,28 @@ func newCliente(conn net.Conn, servidor *Servidor) *Cliente {
 }
 
 func (c *Cliente) leeMensajesCliente() {
-	var lector *bufio.Reader
-	lector = bufio.NewReader(c.conn)
+
+	//nos aseguramos de siempre cerrar la conexion al terminar la funcion
+	defer func() {
+		fmt.Println("Ejecutando limpieza del socket...")
+		msg := protocolo.DisconnectMessage{
+			Type: protocolo.Disconnect,
+		}
+		GDesconecta(c, &msg)
+	}()
+
+	lector := bufio.NewReader(c.conn)
 	for {
-		var mensaje string
-		var err error
-		mensaje, err = lector.ReadString('\n')
+		mensaje, err := lector.ReadString('\n')
 		if err != nil {
-			fmt.Println("El cliente se desconectó")
-			c.conn.Close()
+			fmt.Println("Error de lectura o cliente desconectado.")
 			return
 		}
-		c.servidor.ProcesarMensaje(c, mensaje)
+
+		continua := c.servidor.ProcesarMensaje(c, mensaje)
+		if !continua {
+			fmt.Println("Deteniendo lectura de mensajes para este cliente por error de protocolo.")
+			return
+		}
 	}
 }

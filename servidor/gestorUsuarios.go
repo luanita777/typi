@@ -1,6 +1,8 @@
 package main
 
-import "servidor/protocolo"
+import (
+	"servidor/protocolo"
+)
 
 func GIdentifica(cliente *Cliente, msg *protocolo.IdentifyMessage) {
 	if msg.Username == "" || len(msg.Username) > 8 {
@@ -80,4 +82,45 @@ func GListaDeUsuarios(cliente *Cliente) {
 	}
 
 	GEnviarJSON(cliente, datosJSON)
+}
+
+func GDesconecta(cliente *Cliente, msg *protocolo.DisconnectMessage) {
+	cliente.servidor.mu.Lock()
+
+	nombre := cliente.nombreUsuario
+
+	if nombre == "" {
+		cliente.servidor.mu.Unlock()
+		cliente.conn.Close()
+		return
+	}
+
+	_, existe := cliente.servidor.clientes[nombre]
+	if !existe {
+		cliente.servidor.mu.Unlock()
+		cliente.conn.Close()
+		return
+	}
+
+	for _, cuarto := range cliente.servidor.cuartos {
+		if cuarto.EstaEnCuarto(cliente.nombreUsuario) {
+			msg := protocolo.LeaveRoomMessage{
+				Type:     protocolo.LeaveRoom,
+				Roomname: cuarto.nombreCuarto,
+			}
+
+			GAbandonarCuarto(cliente, &msg)
+		}
+	}
+
+	mensajeJSON := protocolo.DisconnectedMessage{
+		Type:     "DISCONNECTED",
+		Username: cliente.nombreUsuario,
+	}
+
+	delete(cliente.servidor.clientes, cliente.nombreUsuario)
+	cliente.servidor.mu.Unlock()
+
+	GNotificarATodos(cliente.servidor, mensajeJSON, cliente)
+	cliente.conn.Close()
 }

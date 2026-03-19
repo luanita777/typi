@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"servidor/protocolo"
+	"sync"
 )
 
 // Creamos un tipo de dato servidor, el cuál tiene como
@@ -16,6 +17,7 @@ type Servidor struct {
 	clientes    map[string]*Cliente
 	cuartos     map[string]*Cuarto
 	numClientes int
+	mu          sync.Mutex
 }
 
 // Creamos un nuevo servidor (Constructor)
@@ -71,7 +73,7 @@ func (s *Servidor) manejarConexionCliente(conn net.Conn) {
 // por ejemplo, si nos mandaron un identify debemos revisar si existe
 // ya ese cliente, si sí respondemos que no puede usar ese nombre y si no
 // le decimos que sucess y lo dejamos entrar al chat
-func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
+func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 
 	var mensajeJSON []byte = []byte(mensaje)
 	var mensajeBase protocolo.MensajeBase
@@ -80,7 +82,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 	if err != nil {
 		fmt.Println("JSON inválido: ", err)
 		GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-		return
+		return false
 	}
 
 	switch mensajeBase.Type {
@@ -89,16 +91,25 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GIdentifica(cliente, &msj)
+
+	case protocolo.Disconnect:
+		var msj protocolo.DisconnectMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return false
+		}
+		GDesconecta(cliente, &msj)
 
 	case protocolo.Status:
 		var msj protocolo.StatusMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GActualizaStatus(cliente, &msj)
 
@@ -107,7 +118,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GListaDeUsuarios(cliente)
 
@@ -116,7 +127,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GMensajePrivado(cliente, &msj)
 
@@ -125,7 +136,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GMensajePublico(cliente, &msj)
 
@@ -134,7 +145,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GCreaNuevoCuarto(cliente, &msj)
 
@@ -143,7 +154,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GInvitaACuarto(cliente, &msj)
 
@@ -152,7 +163,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GUnirseACuarto(cliente, &msj)
 
@@ -161,7 +172,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GUsuariosCuarto(cliente, &msj)
 
@@ -170,9 +181,21 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) {
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
 			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
-			return
+			return false
 		}
 		GRoomText(cliente, &msj)
+
+	case protocolo.LeaveRoom:
+		var msj protocolo.LeaveRoomMessage
+		var err error = json.Unmarshal(mensajeJSON, &msj)
+		if err != nil {
+			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			return false
+		}
+		GAbandonarCuarto(cliente, &msj)
+
 	}
+
+	return true
 
 }
