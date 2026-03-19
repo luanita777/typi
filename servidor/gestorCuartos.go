@@ -1,7 +1,6 @@
 package main
 
 import (
-	//	"encoding/json"
 	"servidor/protocolo"
 )
 
@@ -15,16 +14,21 @@ func GCreaNuevoCuarto(cliente *Cliente, msg *protocolo.NewRoomMessage) {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
+
 	_, existe := cliente.servidor.cuartos[msg.Roomname]
 	if existe == true {
+		cliente.servidor.mutex.Unlock()
 		GResponderErrorExtra(cliente, protocolo.NewRoom, protocolo.RoomAlreadyExists, msg.Roomname)
 		return
 	}
 
 	cuarto := NuevoCuarto(msg.Roomname)
 	cliente.servidor.cuartos[msg.Roomname] = cuarto
-	cuarto.AgregarCliente(cliente)
 
+	cliente.servidor.mutex.Unlock()
+
+	cuarto.AgregarCliente(cliente)
 	GResponderSuccessExtra(cliente, protocolo.NewRoom, msg.Roomname)
 }
 
@@ -34,19 +38,21 @@ func GInvitaACuarto(cliente *Cliente, msg *protocolo.InviteMessage) {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
 	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	cliente.servidor.mutex.Unlock()
+
 	if !existeCuarto {
 		GResponderErrorExtra(cliente, protocolo.Invite, protocolo.NoSuchRoom, msg.Roomname)
 		return
 	}
 
-	_, estaEnElCuarto := cuartoActual.participantes[cliente.nombreUsuario]
-	if !estaEnElCuarto {
+	if !cuartoActual.EstaEnCuarto(cliente.ObtenerNombreUsuario()) {
 		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.NotJoined)
 		return
 	}
 
-	if msg.Usernames == nil || len(msg.Usernames) == 0 {
+	if len(msg.Usernames) == 0 {
 		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 		return
 	}
@@ -57,24 +63,26 @@ func GInvitaACuarto(cliente *Cliente, msg *protocolo.InviteMessage) {
 			return
 		}
 
+		cliente.servidor.mutex.Lock()
 		invitado, existe := cliente.servidor.clientes[username]
+		cliente.servidor.mutex.Unlock()
+
 		if !existe {
 			GResponderErrorExtra(cliente, protocolo.Invite, protocolo.NoSuchUser, username)
 			return
 		}
 
-		if cuartoActual.EstaInvitado(invitado.nombreUsuario) ||
-			cuartoActual.EstaEnCuarto(invitado.nombreUsuario) {
+		if cuartoActual.EstaInvitado(invitado.ObtenerNombreUsuario()) ||
+			cuartoActual.EstaEnCuarto(invitado.ObtenerNombreUsuario()) {
 			continue
 		}
+		cuartoActual.AgregarInvitado(invitado)
 
 		mensajeJSON := protocolo.InvitationMessage{
 			Type:     "INVITATION",
-			Username: cliente.nombreUsuario,
+			Username: cliente.ObtenerNombreUsuario(),
 			Roomname: msg.Roomname,
 		}
-
-		cuartoActual.invitados[invitado.nombreUsuario] = true
 
 		GEnviarJSON(invitado, mensajeJSON)
 	}
@@ -85,45 +93,34 @@ func GUnirseACuarto(cliente *Cliente, msg *protocolo.JoinRoomMessage) {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
 	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	cliente.servidor.mutex.Unlock()
 	if !existeCuarto {
 		GResponderErrorExtra(cliente, protocolo.JoinRoom, protocolo.NoSuchRoom, msg.Roomname)
 		return
 	}
 
-	if !cuartoActual.EstaInvitado(cliente.nombreUsuario) {
+	if !cuartoActual.EstaInvitado(cliente.ObtenerNombreUsuario()) {
 		GResponderErrorExtra(cliente, protocolo.JoinRoom, protocolo.NotInvited, msg.Roomname)
 		return
 	}
 
-	if cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+	if cuartoActual.EstaEnCuarto(cliente.ObtenerNombreUsuario()) {
 		return
 	}
 
-	cuartoActual.AgregarCliente(cliente)
-	delete(cuartoActual.invitados, cliente.nombreUsuario)
-
+	cuartoActual.UnirCliente(cliente)
 	GResponderSuccessExtra(cliente, protocolo.JoinRoom, msg.Roomname)
-	notificarUnionACuartoATodos(cliente, cuartoActual)
 
-}
-
-func notificarUnionACuartoATodos(cliente *Cliente, cuarto *Cuarto) {
 	mensajeJSON := protocolo.JoinedRoomMessage{
 		Type:     "JOINED_ROOM",
-		Roomname: cuarto.nombreCuarto,
-		Username: cliente.nombreUsuario,
+		Roomname: msg.Roomname,
+		Username: cliente.ObtenerNombreUsuario(),
 	}
-	enviarATodosEnElCuarto(cuarto, cliente, mensajeJSON)
-}
 
-func enviarATodosEnElCuarto(cuarto *Cuarto, excluir *Cliente, mensaje any) {
-	for _, cliente := range cuarto.participantes {
-		if cliente == excluir {
-			continue
-		}
-		GEnviarJSON(cliente, mensaje)
-	}
+	cuartoActual.EnviarMensajeCuarto(mensajeJSON, cliente)
+
 }
 
 func GUsuariosCuarto(cliente *Cliente, msg *protocolo.RoomUsersMessage) {
@@ -131,7 +128,10 @@ func GUsuariosCuarto(cliente *Cliente, msg *protocolo.RoomUsersMessage) {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
 	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	cliente.servidor.mutex.Unlock()
+
 	if !existeCuarto {
 		GResponderErrorExtra(cliente, protocolo.RoomUsers, protocolo.NoSuchRoom, msg.Roomname)
 		return
@@ -143,8 +143,9 @@ func GUsuariosCuarto(cliente *Cliente, msg *protocolo.RoomUsersMessage) {
 	}
 
 	listaUsuarios := make(map[string]protocolo.StatusCliente)
-	for nombreUsuario, c := range cuartoActual.participantes {
-		listaUsuarios[nombreUsuario] = c.estado
+
+	for _, c := range cuartoActual.ObtenerParticipantes() {
+		listaUsuarios[c.ObtenerNombreUsuario()] = c.ObtenerEstado()
 	}
 
 	mensajeJSON := protocolo.RoomUserListMessage{
@@ -162,13 +163,16 @@ func GRoomText(cliente *Cliente, msg *protocolo.RoomTextMessage) {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
 	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	cliente.servidor.mutex.Unlock()
+
 	if !existeCuarto {
 		GResponderErrorExtra(cliente, protocolo.RoomText, protocolo.NoSuchRoom, msg.Roomname)
 		return
 	}
 
-	if !cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+	if !cuartoActual.EstaEnCuarto(cliente.ObtenerNombreUsuario()) {
 		GResponderErrorExtra(cliente, protocolo.RoomText, protocolo.NotJoined, msg.Roomname)
 		return
 	}
@@ -176,11 +180,11 @@ func GRoomText(cliente *Cliente, msg *protocolo.RoomTextMessage) {
 	mensajeJSON := protocolo.RoomTextFromMessage{
 		Type:     "ROOM_TEXT_FROM",
 		Roomname: msg.Roomname,
-		Username: cliente.nombreUsuario,
+		Username: cliente.ObtenerNombreUsuario(),
 		Text:     msg.Text,
 	}
 
-	enviarATodosEnElCuarto(cuartoActual, cliente, mensajeJSON)
+	cuartoActual.EnviarMensajeCuarto(mensajeJSON, cliente)
 }
 
 func GAbandonarCuarto(cliente *Cliente, msg *protocolo.LeaveRoomMessage) {
@@ -188,26 +192,33 @@ func GAbandonarCuarto(cliente *Cliente, msg *protocolo.LeaveRoomMessage) {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
 	cuartoActual, existeCuarto := cliente.servidor.cuartos[msg.Roomname]
+	cliente.servidor.mutex.Unlock()
+
 	if !existeCuarto {
 		GResponderErrorExtra(cliente, protocolo.LeaveRoom, protocolo.NoSuchRoom, msg.Roomname)
 		return
 	}
 
-	if !cuartoActual.EstaEnCuarto(cliente.nombreUsuario) {
+	if !cuartoActual.EstaEnCuarto(cliente.ObtenerNombreUsuario()) {
 		GResponderErrorExtra(cliente, protocolo.LeaveRoom, protocolo.NotJoined, msg.Roomname)
 		return
 	}
 
+	cuartoActual.EliminarCliente(cliente)
+
 	mensajeJSON := protocolo.LeftRoomMessage{
 		Type:     "LEFT_ROOM",
 		Roomname: msg.Roomname,
-		Username: cliente.nombreUsuario,
+		Username: cliente.ObtenerNombreUsuario(),
 	}
 
-	delete(cuartoActual.participantes, cliente.nombreUsuario)
-	if len(cuartoActual.participantes) == 0 {
+	cuartoActual.EnviarMensajeCuarto(mensajeJSON, cliente)
+
+	if cuartoActual.NumeroParticipantes() == 0 {
+		cliente.servidor.mutex.Lock()
 		delete(cliente.servidor.cuartos, cuartoActual.nombreCuarto)
+		cliente.servidor.mutex.Unlock()
 	}
-	enviarATodosEnElCuarto(cuartoActual, cliente, mensajeJSON)
 }

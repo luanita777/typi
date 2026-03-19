@@ -10,14 +10,16 @@ func GIdentifica(cliente *Cliente, msg *protocolo.IdentifyMessage) {
 		return
 	}
 
-	if cliente.nombreUsuario != "" {
+	if cliente.ObtenerNombreUsuario() != "" {
 		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 		return
 	}
 
 	//map access multi-value return -> mapaccess2
+	cliente.servidor.mutex.Lock()
 	_, existe := cliente.servidor.clientes[msg.Username]
-	if existe == true {
+	if existe {
+		cliente.servidor.mutex.Unlock()
 		GResponderError(cliente, protocolo.Identify, protocolo.UserAlreadyExists)
 		return
 	}
@@ -25,19 +27,16 @@ func GIdentifica(cliente *Cliente, msg *protocolo.IdentifyMessage) {
 	cliente.nombreUsuario = msg.Username
 	cliente.estado = protocolo.Active
 	cliente.servidor.clientes[msg.Username] = cliente
+	cliente.servidor.mutex.Unlock()
 
 	GResponderSuccess(cliente, protocolo.Identify)
-	notificarNuevoUsuario(cliente)
-}
 
-func notificarNuevoUsuario(cliente *Cliente) {
-
-	msg := protocolo.NewUserMessage{
+	mensajeJSON := protocolo.NewUserMessage{
 		Type:     "NEW_USER",
-		Username: cliente.nombreUsuario,
+		Username: cliente.ObtenerNombreUsuario(),
 	}
 
-	GNotificarATodos(cliente.servidor, msg, cliente)
+	GNotificarATodos(cliente.servidor, mensajeJSON, cliente)
 }
 
 func GActualizaStatus(cliente *Cliente, msg *protocolo.StatusMessage) {
@@ -50,19 +49,18 @@ func GActualizaStatus(cliente *Cliente, msg *protocolo.StatusMessage) {
 		return
 	}
 
+	cliente.mutex.Lock()
 	cliente.estado = msg.Status
-	notificarNuevoStatusDeUsuario(cliente)
-	GResponderSuccess(cliente, "STATUS")
-}
+	cliente.mutex.Unlock()
 
-func notificarNuevoStatusDeUsuario(cliente *Cliente) {
-	msg := protocolo.NewStatusMessage{
+	mensajeJSON := protocolo.NewStatusMessage{
 		Type:     "NEW_STATUS",
-		Username: cliente.nombreUsuario,
-		Status:   cliente.estado,
+		Username: cliente.ObtenerNombreUsuario(),
+		Status:   cliente.ObtenerEstado(),
 	}
+	GNotificarATodos(cliente.servidor, mensajeJSON, cliente)
 
-	GNotificarATodos(cliente.servidor, msg, cliente)
+	GResponderSuccess(cliente, protocolo.Status)
 }
 
 func GListaDeUsuarios(cliente *Cliente) {
@@ -72,8 +70,15 @@ func GListaDeUsuarios(cliente *Cliente) {
 
 	listaUsuarios := make(map[string]protocolo.StatusCliente)
 
-	for nombreUsuario, c := range cliente.servidor.clientes {
-		listaUsuarios[nombreUsuario] = c.estado
+	cliente.servidor.mutex.Lock()
+	copiaClientes := make([]*Cliente, 0, len(cliente.servidor.clientes))
+	for _, c := range cliente.servidor.clientes {
+		copiaClientes = append(copiaClientes, c)
+	}
+	cliente.servidor.mutex.Unlock()
+
+	for _, c := range copiaClientes {
+		listaUsuarios[c.ObtenerNombreUsuario()] = c.ObtenerEstado()
 	}
 
 	datosJSON := protocolo.UserListMessage{
@@ -85,25 +90,35 @@ func GListaDeUsuarios(cliente *Cliente) {
 }
 
 func GDesconecta(cliente *Cliente, msg *protocolo.DisconnectMessage) {
-	cliente.servidor.mu.Lock()
 
-	nombre := cliente.nombreUsuario
+	nombre := cliente.ObtenerNombreUsuario()
+
+	cliente.servidor.mutex.Lock()
 
 	if nombre == "" {
-		cliente.servidor.mu.Unlock()
+		cliente.servidor.mutex.Unlock()
 		cliente.conn.Close()
 		return
 	}
 
 	_, existe := cliente.servidor.clientes[nombre]
 	if !existe {
-		cliente.servidor.mu.Unlock()
+		cliente.servidor.mutex.Unlock()
 		cliente.conn.Close()
 		return
 	}
 
+	//copiamos la lista de cuartos
+	copiaCuartos := make([]*Cuarto, 0, len(cliente.servidor.cuartos))
 	for _, cuarto := range cliente.servidor.cuartos {
-		if cuarto.EstaEnCuarto(cliente.nombreUsuario) {
+		copiaCuartos = append(copiaCuartos, cuarto)
+	}
+
+	delete(cliente.servidor.clientes, nombre)
+	cliente.servidor.mutex.Unlock()
+
+	for _, cuarto := range copiaCuartos {
+		if cuarto.EstaEnCuarto(nombre) {
 			msg := protocolo.LeaveRoomMessage{
 				Type:     protocolo.LeaveRoom,
 				Roomname: cuarto.nombreCuarto,
@@ -115,11 +130,8 @@ func GDesconecta(cliente *Cliente, msg *protocolo.DisconnectMessage) {
 
 	mensajeJSON := protocolo.DisconnectedMessage{
 		Type:     "DISCONNECTED",
-		Username: cliente.nombreUsuario,
+		Username: nombre,
 	}
-
-	delete(cliente.servidor.clientes, cliente.nombreUsuario)
-	cliente.servidor.mu.Unlock()
 
 	GNotificarATodos(cliente.servidor, mensajeJSON, cliente)
 	cliente.conn.Close()

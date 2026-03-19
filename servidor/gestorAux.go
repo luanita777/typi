@@ -24,8 +24,7 @@ func GResponderOperacionInvalida(cliente *Cliente, operacion protocolo.TipoMensa
 		Result:    respuesta,
 	}
 
-	datosJSON, _ := json.Marshal(respuestaJSON)
-	cliente.conn.Write(append(datosJSON, '\n'))
+	GEnviarJSON(cliente, respuestaJSON)
 }
 
 func GResponderError(cliente *Cliente, operacion protocolo.TipoMensaje, respuesta protocolo.TipoResultado) {
@@ -35,8 +34,7 @@ func GResponderError(cliente *Cliente, operacion protocolo.TipoMensaje, respuest
 		Result:    respuesta,
 	}
 
-	datosJSON, _ := json.Marshal(respuestaJSON)
-	cliente.conn.Write(append(datosJSON, '\n'))
+	GEnviarJSON(cliente, respuestaJSON)
 }
 
 func GResponderErrorExtra(cliente *Cliente, operacion protocolo.TipoMensaje, respuesta protocolo.TipoResultado, extra string) {
@@ -47,29 +45,28 @@ func GResponderErrorExtra(cliente *Cliente, operacion protocolo.TipoMensaje, res
 		Extra:     extra,
 	}
 
-	datosJSON, _ := json.Marshal(respuestaJSON)
-	cliente.conn.Write(append(datosJSON, '\n'))
+	GEnviarJSON(cliente, respuestaJSON)
 }
 
 func GResponderSuccess(cliente *Cliente, operacion protocolo.TipoMensaje) {
 	respuesta := protocolo.ResponseMessage{
 		Type:      "RESPONSE",
 		Operation: operacion,
-		Result:    "SUCCESS",
+		Result:    protocolo.Success,
 	}
 
 	GEnviarJSON(cliente, respuesta)
 }
 
 func GResponderSuccessExtra(cliente *Cliente, operacion protocolo.TipoMensaje, extra string) {
-	respuesta := protocolo.ResponseMessage{
+	respuestaJSON := protocolo.ResponseMessage{
 		Type:      "RESPONSE",
 		Operation: operacion,
-		Result:    "SUCCESS",
+		Result:    protocolo.Success,
 		Extra:     extra,
 	}
 
-	GEnviarJSON(cliente, respuesta)
+	GEnviarJSON(cliente, respuestaJSON)
 }
 
 func GEnviarJSON(cliente *Cliente, mensaje any) {
@@ -79,13 +76,21 @@ func GEnviarJSON(cliente *Cliente, mensaje any) {
 		fmt.Println("Error en el servidor. (Error enviando JSON)", err)
 		return
 	}
+	cliente.mutex.Lock()
+	defer cliente.mutex.Unlock()
 	cliente.conn.Write(append(jsonData, '\n'))
+
 }
 
 func GNotificarATodos(servidor *Servidor, mensaje any, excluir *Cliente) {
+	servidor.mutex.Lock()
+	copiaClientes := make([]*Cliente, 0, len(servidor.clientes))
+	for _, c := range servidor.clientes {
+		copiaClientes = append(copiaClientes, c)
+	}
+	servidor.mutex.Unlock()
 
-	for _, cliente := range servidor.clientes {
-
+	for _, cliente := range copiaClientes {
 		if cliente == excluir {
 			continue
 		}
@@ -96,7 +101,7 @@ func GNotificarATodos(servidor *Servidor, mensaje any, excluir *Cliente) {
 
 func clienteIdentificado(cliente *Cliente) bool {
 
-	if cliente.nombreUsuario == "" {
+	if cliente.ObtenerNombreUsuario() == "" {
 		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.NotIdentified)
 		return false
 	}

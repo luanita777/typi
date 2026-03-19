@@ -1,9 +1,6 @@
 package main
 
-import (
-	"encoding/json"
-	"servidor/protocolo"
-)
+import "servidor/protocolo"
 
 func GMensajePrivado(cliente *Cliente, msg *protocolo.TextMessage) {
 
@@ -16,26 +13,26 @@ func GMensajePrivado(cliente *Cliente, msg *protocolo.TextMessage) {
 		return
 	}
 
-	if msg.Username == cliente.nombreUsuario {
+	if msg.Username == cliente.ObtenerNombreUsuario() {
 		return
 	}
 
+	cliente.servidor.mutex.Lock()
 	clienteDestino, existe := cliente.servidor.clientes[msg.Username]
+	cliente.servidor.mutex.Unlock()
 
 	if !existe {
-		GResponderErrorExtra(cliente, protocolo.Text,
-			protocolo.NoSuchUser, msg.Username)
+		GResponderErrorExtra(cliente, protocolo.Text, protocolo.NoSuchUser, msg.Username)
 		return
 	}
 
 	mensaje := protocolo.TextFromMessage{
 		Type:     "TEXT_FROM",
-		Username: cliente.nombreUsuario,
+		Username: cliente.ObtenerNombreUsuario(),
 		Text:     msg.Text,
 	}
 
-	datosJSON, _ := json.Marshal(mensaje)
-	clienteDestino.conn.Write(append(datosJSON, '\n'))
+	GEnviarJSON(clienteDestino, mensaje)
 }
 
 func GMensajePublico(cliente *Cliente, msg *protocolo.PublicTextFromMessage) {
@@ -50,7 +47,7 @@ func GMensajePublico(cliente *Cliente, msg *protocolo.PublicTextFromMessage) {
 
 	mensaje := protocolo.PublicTextFromMessage{
 		Type:     "PUBLIC_TEXT_FROM",
-		Username: cliente.nombreUsuario,
+		Username: cliente.ObtenerNombreUsuario(),
 		Text:     msg.Text,
 	}
 

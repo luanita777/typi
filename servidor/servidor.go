@@ -17,7 +17,7 @@ type Servidor struct {
 	clientes    map[string]*Cliente
 	cuartos     map[string]*Cuarto
 	numClientes int
-	mu          sync.Mutex
+	mutex       sync.Mutex
 }
 
 // Creamos un nuevo servidor (Constructor)
@@ -59,9 +59,12 @@ func (s *Servidor) iniciaServidor() {
 func (s *Servidor) manejarConexionCliente(conn net.Conn) {
 
 	var cliente *Cliente = newCliente(conn, s)
+	s.mutex.Lock()
 	s.numClientes++
-	fmt.Printf("Cliente %v conectado.\n", s.clientes)
-	go cliente.leeMensajesCliente()
+	num := s.numClientes
+	s.mutex.Unlock()
+	fmt.Printf("Cliente %v conectado.\n", num)
+	cliente.leeMensajesCliente()
 }
 
 // En esencia lo que se hace es que se recibe un mensaje dado un cliente
@@ -81,7 +84,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 	err = json.Unmarshal(mensajeJSON, &mensajeBase)
 	if err != nil {
 		fmt.Println("JSON inválido: ", err)
-		GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 		return false
 	}
 
@@ -90,7 +93,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.IdentifyMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GIdentifica(cliente, &msj)
@@ -99,7 +102,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.DisconnectMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GDesconecta(cliente, &msj)
@@ -108,7 +111,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.StatusMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GActualizaStatus(cliente, &msj)
@@ -117,7 +120,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.UsersMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GListaDeUsuarios(cliente)
@@ -126,7 +129,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.TextMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GMensajePrivado(cliente, &msj)
@@ -135,7 +138,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.PublicTextFromMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GMensajePublico(cliente, &msj)
@@ -144,7 +147,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.NewRoomMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GCreaNuevoCuarto(cliente, &msj)
@@ -153,7 +156,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.InviteMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GInvitaACuarto(cliente, &msj)
@@ -162,7 +165,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.JoinRoomMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GUnirseACuarto(cliente, &msj)
@@ -171,7 +174,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.RoomUsersMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GUsuariosCuarto(cliente, &msj)
@@ -180,7 +183,7 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.RoomTextMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GRoomText(cliente, &msj)
@@ -189,10 +192,14 @@ func (s *Servidor) ProcesarMensaje(cliente *Cliente, mensaje string) bool {
 		var msj protocolo.LeaveRoomMessage
 		var err error = json.Unmarshal(mensajeJSON, &msj)
 		if err != nil {
-			GResponderOperacionInvalida(cliente, "INVALID", "INVALID")
+			GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
 			return false
 		}
 		GAbandonarCuarto(cliente, &msj)
+
+	default:
+		GResponderOperacionInvalida(cliente, protocolo.Invalid, protocolo.ResultadoInvalido)
+		return false
 
 	}
 
