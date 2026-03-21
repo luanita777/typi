@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"servidor/protocolo"
 )
 
@@ -73,12 +74,22 @@ func GEnviarJSON(cliente *Cliente, mensaje any) {
 
 	jsonData, err := json.Marshal(mensaje)
 	if err != nil {
-		fmt.Println("Error en el servidor. (Error enviando JSON)", err)
+		if err != io.EOF {
+			fmt.Println("Cliente cerró la conexion.")
+			return
+		} else {
+			fmt.Println("Error de lectura:", err)
+		}
 		return
 	}
+	fmt.Println(string(jsonData))
 	cliente.mutex.Lock()
 	defer cliente.mutex.Unlock()
-	cliente.conn.Write(append(jsonData, '\n'))
+	data := append(jsonData, 0)
+	_, err = cliente.conn.Write(append(data))
+	if err != nil {
+		fmt.Println("Error escribiendo en conexion: ", err)
+	}
 
 }
 
