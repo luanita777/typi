@@ -1,0 +1,8 @@
+services:
+  servidor:
+    build: ./servidor
+    environment:
+      - PUERTO
+    ports:
+      - "${PUERTO}:${PUERTO}"
+    command: ["./servidor", "${PUERTO}"]
