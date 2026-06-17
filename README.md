@@ -18,7 +18,3 @@ Este repositorio contiene al **servidor**, además de un `docker-compose.yml` pa
 2. Desde la raíz del proyecto, ejecutar:
       `sudo PUERTO=1234 docker compose up --build
 
----
-#### Aclaracion
-La verdad es que el tiempo me comió y no alcancé a terminar mas que el servidor, mentalmente fue demasiada carga junto con mis otras materias así como actividades extracurriculares que estoy llevando, de verdad lo intenté:(
-
